@@ -1,6 +1,168 @@
 Change Log
 =============
 
+[upcoming release] - 2025-..-..
+-------------------------------
+- [ADDED] enabling connection of valves directly to pipes besides connection between two junctions
+- [ADDED] tutorial for combining the DHNx package and pandapipes
+- [CHANGED] Improve readability of setting pipeflow options
+- [FIXED] Default compressibility model in STANET converter now set to "linear" to avoid Exceptions
+- [CHANGED] Colebrook-White friction model now uses scipy.optimize.newton for solving the equation
+- [CHANGED] Fluid properties compressibility and viscosity can now process pressure and temperature as inputs, if given the "allow_2d" attribute
+- [CHANGED] Temperature change along pipes now based on exponential function and does not use qext_w anymore
+
+[0.12.0] - 2025-06-27
+-------------------------------
+- [ADDED] transient heat transfer timeseries simulation
+- [ADDED] pressure_control_trace in simple_plotly
+- [ADDED] explicit call of Sphinx-Config file
+- [ADDED] possibility for heat consumer to be considered in nxgraph
+- [CHANGED] loading of JSON files with unknown objects as simple dicts is possible now
+- [CHANGED] GitHub Actions test workflow to speed up execution time
+- [CHANGED] removed duplicated code from calculate_darivates_thermal
+- [CHANGED] variable names "VLRLCONNECT" to "FLOW_RETURN_CONNECT"
+- [CHANGED] heat_consumer improved stability
+- [CHANGED] e2n renaming in documentation
+- [CHANGED] Correct controller documentation
+- [CHANGED] avoid bool(in_service) for bulk create functions
+- [CHANGED] buildup igraph
+- [CHANGED] default output writer to log only existing components to avoid errors
+- [FIXED] docs_check test pipeline
+- [FIXED] a bug in bidirectional calculation for timeseries calculations for timesteps with qext_w=0
+- [FIXED] imports and dependencies from pandapower
+- [FIXED] correction of how to handle input temperature at circ pumps
+
+[0.11.0] - 2024-11-07
+-------------------------------
+- [ADDED] heat_consumer plotting
+- [ADDED] variable "u_w_per_m2k" to std_type pipe
+- [ADDED] standard district heating pipe types
+- [ADDED] support for Python 3.12
+- [ADDED] t_outlet_k to result tables of branch components
+- [ADDED] relying tests, to check the ability to work with pandapower develop
+- [ADDED] bidirectional calculation mode for heat calculations
+- [CHANGED] heat_consumer to enable temperature control
+- [CHANGED] switched from setup.py to pyproject.toml
+- [CHANGED] variable "alpha_w_per_m2k" to "u_w_per_m2k"
+- [CHANGED] option "all" for pipeflow heat calculations to "sequential", the new option is "bidirectional"
+- [CHANGED] volume flow in result tables instead of normalized volume flow for non gas fluids
+- [CHANGED] introduction of slack mass flow into nodes as solved variable
+- [CHANGED] circulation pumps are now branches and thus cannot generate or consume mass
+- [FIXED] Pressure plot not working for circ pump
+- [FIXED] volume flow rate for incompressible fluids based on real density, thus in this case results are renamed from "vdot_norm_m3_per_s" to "vdot_m3_per_s"
+- [FIXED] some imports from pandapower
+- [FIXED] NAN to nan because of numpy changes
+- [FIXED] if velocity in a branch is negative to get corrected nodes from the branch pit
+- [FIXED] plot pressure profile not working for circulation pump sources
+- [FIXED] Infeed switches are considered correctly
+- [FIXED] Heat consumers with qext_w = 0 and temperature control ignore temperature set points
+- [FIXED] alpha also applied to mdot
+- [REMOVED] support for Python 3.8 due to EOL
+
+
+
+[0.10.0] - 2024-04-09
+-------------------------------
+
+- [ADDED] function for plotting pressure profile
+- [ADDED] function for calculating distance to junctions
+- [ADDED] topology function for returning unsupplied junctions
+- [ADDED] topology function for returning elements on path
+- [ADDED] function for getting all branch-component table names
+- [ADDED] function for getting all branch-component models
+- [ADDED] component 'heat_consumer' that combines the two components heat_exchanger and flow_control
+- [CHANGED] moving generalizing pit entries up from specific components to the abstract class
+- [CHANGED] 'JAC_DERIV_DT1' to 'JAC_DERIV_DTOUT'
+- [CHANGED] solving for minit instead of vinit
+- [CHANGED] distinct max. iteration settings for hydraulic and thermal calculation
+- [CHANGED] default tolerances from 1e-4 to 1e-5
+- [FIXED] results of old grid are wrong, pipeflow needs to be conducted again
+- [FIXED] taking norm density instead of real density in Darcy-Weisbach equation
+- [FIXED] in circulation pumps only junctions in-service are considered
+
+[0.9.0] - 2023-12-22
+-------------------------------
+
+- [ADDED] multiple creation of heat exchanger
+- [ADDED] support Python 3.11 (now included in test pipeline)
+- [ADDED] after the connectivity check, intercept the pipeflow if no more nodes are in-service (heat and hydraulic)
+- [ADDED] adding biomethane (pure and treated) as additonal fluid
+- [ADDED] result tables can be assembled modularly
+- [CHANGED] dropped support for Python 3.7 (no longer included in test pipeline)
+- [CHANGED] connectivity check now separated by hydraulics and heat_transfer calculation, so that also results can differ in some rows (NaN or not)
+- [CHANGED] dynamic creation of lookups for getting pit as pandas tables
+- [CHANGED] components can have their own internal arrays for specific calculations (e.g. for compressor pressure ratio), so that the pit does not need to include such component specific entries
+- [CHANGED] .readthedocs.yml due to deprecation
+- [CHANGED] changing from setuptools flat-layout into src-layout
+- [CHANGED] calculate thermal derivative globally, adaptions before/after can be done component-wise
+- [CHANGED] moving 'PipeflowNotConverged' error from pipeflow to pipeflow_setup
+- [CHANGED] moving 'result_extraction' under pf folder
+- [FIXED] in STANET converter: bug fix for heat exchanger creation and external temperatures of pipes added
+- [FIXED] build igraph considers all components
+- [FIXED] creating nxgraph and considering pressure circulation pumps correctly
+- [FIXED] error in tutorial 'circular flow in a district heating grid'
+- [FIXED] caused error during 'pip install pandapipes'
+- [REMOVED] broken travis badge removed from readme
+- [REMOVED] branch TINIT removed as it is not a solution variable, temperature determined on the fly
+- [REMOVED] 'converged' setting from options
+
+[0.8.5] - 2023-06-19
+-------------------------------
+- [FIXED] consider ambient pressure in calculation of compression power for pumps/compressors
+- [FIXED] np.bool error in pipeflow calculation due to deprecation of np.bool
+- [FIXED] use igraph package instead of python-igraph (has been renamed)
+- [ADDED] gas specific calculation of heat capacity ration kappa = cp/cv (for pumps/compressors)
+- [REMOVED] Python 3.7 removed from test pipeline due to inconsistencies with pandapower
+
+[0.8.4] - 2023-02-02
+-------------------------------
+- [FIXED] added flow control to nxgraph
+- [FIXED] in case of multiple pumps, there was a bug when calculating pressure
+- [FIXED] if all pumps are out of service, the pipeflow did not converge
+- [FIXED] remove unnecessary checkout in release.yml and tutorial tests
+
+[0.8.3] - 2023-01-09
+-------------------------------
+- [FIXED] inconsistency between testpypi and pypi
+
+[0.8.2] - 2023-01-08
+-------------------------------
+- [FIXED] failing tutorial tests on pypi
+
+[0.8.1] - 2023-01-08
+-------------------------------
+- [ADDED] shapely as additional requirement (due to the stanet2pandapipes converter)
+- [ADDED] missing components in collection docu were added
+- [FIXED] undetected failing tests fixed
+
+[0.8.0] - 2023-01-05
+-------------------------------
+- [ADDED] new component `flow controller`: a branch component that controls the flow through itself. The flow controller component is able to keep its mass flow fixed. It adapts the pressure drop between two junctions to reflect the desired flow situation.
+- [ADDED] new component `mass_storage` and tutorial how to use it
+- [ADDED] a stanet converter has been added incl. a stanet converter documentation
+- [ADDED] in the course of the stanet converter release a component called valve-pipe was introduced. It is a combination of a valve and a pipe
+- [ADDED] automated release process
+- [ADDED] documentation added for circulation pumps of any kind, compressors, flow controller, pressure controller and mass storage
+- [ADDED] adding property based on the sutherland model as additional FluidProperty
+- [ADDED] besides regression models it is also possible to use interpolation models in case of StdTypes
+- [ADDED] enable bulk creation of flow controls and ext grids
+- [ADDED] toolbox function to extract the _pit (pandapipes internal tables) structure for nodes and branches as pandas tables with meaningful names for the stored columns as given in the node_idx and branch_idx files
+- [ADDED] new global variable `__format_version__` that shall only be increased in case of API changes (i.e. if the convert_format function for JSON I/O must be called)
+- [ADDED] documentation check which is able to throw errors in case of warnings
+- [ADDED] example networks including new component types for the convert_format test
+- [CHANGED] circ pump is now a branch component
+- [CHANGED] default roughness parameter `k_mm` for pipes is now 0.2 mm instead of 1 mm (all create_pipe... functions)
+- [CHANGED] instead of from and to junction, in case of circulation pumps it is called return and flow junction from now on
+- [CHANGED] suffix 'flow' added to input variable p, t an mass in case of circulation pumps
+- [CHANGED] ctrl/ts_variables dict in multinet gets an intermediate level 'nets', so that the structure is similar to Multinet ADict
+- [CHANGED] order of the pump entries was adapted (v, p, degree)
+- [CHANGED] by default p and t are set to None in case of ext grids. Based on the type selected, p and t must be adapted accordingly. If set to 'auto', based on the given p and t values, the type is set
+- [CHANGED] 'auto' can also be set for type in case of circulation pumps. The behavior is the same as in case of ext grids
+- [CHANGED] authors list adapted
+- [CHANGED] as of now, not one but two example nets (water and gas) will be created for the convert_format test (ensure backward compatibility when loading nets from jsons)
+- [FIXED] the references to pipeflow procedures have changed. Caused problems in the documentation
+- [FIXED] removed unused import of 'progress_bar' from pandapower which caused import problems
+
 [0.7.0] - 2022-08-02
 -------------------------------
 - [ADDED] automated test with Python 3.10 added to GitHub Actions CI (now Python 3.7 - 3.10)
@@ -26,8 +188,8 @@ Change Log
 
 [0.6.0] - 2022-02-07
 -------------------------------
-- [ADDED] Adding pressure controller as new component
-- [ADDED] Adding compressor as new component
+- [ADDED] Adding `pressure controller` as new component
+- [ADDED] Adding `compressor` as new component
 - [ADDED] Compressing power of a pump component are returned as result
 - [ADDED] Adding polynomial fluids
 - [CHANGED] Removing irrelevant results in branch models with zero length (mean velocity, lambda, reynolds)

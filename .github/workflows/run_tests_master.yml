@@ -1,7 +1,7 @@
 # This workflow will install Python dependencies, run tests and lint with a variety of Python versions
 # For more information see: https://help.github.com/actions/language-and-framework-guides/using-python-with-github-actions
 
-# pandapipes-master branch has to work with pandapower-master branch
+# pandapipes-master branch is designed to work with pandapower-master branch
 
 name: ppipes_master
 
@@ -13,64 +13,115 @@ on:
 
 jobs:
   build:
-
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        python-version: ['3.7', '3.8', '3.9', '3.10']
-
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+        os:  [ ubuntu-latest, windows-latest ]
     steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a #v4.2.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: uv sync --extra test --extra fileio
+      - name: List all installed packages
+        run: |
+          uv pip list
+      - name: Test with pytest
+        if: ${{ matrix.python-version != '3.11' }}
+        run: |
+          uv run pytest -n auto
+      - name: Test with pytest, Codecov and Coverage
+        if: ${{ matrix.python-version == '3.11' }}
+        run: |
+          uv pip install pytest-cov
+          uv run pytest -n auto --cov=./ --cov-report=xml
+          cp ./coverage.xml ./codecov_coverage.xml
+      - name: Upload coverage to Codacy
+        if: ${{ matrix.python-version == '3.11' && matrix.os == 'ubuntu-latest'}}
+        env:
+          CODACY_PROJECT_TOKEN: ${{ secrets.CODACY_PROJECT_TOKEN }}
+        run: |
+          bash <(curl -Ls https://coverage.codacy.com/get.sh) report -r coverage.xml
+      - name: Upload coverage to Codecov
+        if: ${{ matrix.python-version == '3.11' }}
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: ./codecov_coverage.xml
+          verbose: true
+          exclude: |
+            '**/test/**'
+            '**/__init__.py'
+            'doc/**'
+            'tutorials/**'
+            'pandapipes/networks/network_files/**'
+            '**.yml'
+            '**.rst'
+
+  relying:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+        os:  [ ubuntu-latest, windows-latest ]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a #v4.2.0
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install flake8 pytest python-igraph
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          python -m pip install git+https://github.com/e2nIEE/pandapower@master#egg=pandapower
-          pip install .
+          uv sync --extra test --extra fileio
+          uv pip install git+https://github.com/e2nIEE/pandapower@develop#egg=pandapower
       - name: List all installed packages
         run: |
-          pip list
+          uv pip list
       - name: Test with pytest
-        if: ${{ matrix.python-version != '3.9' }}
+        if: ${{ matrix.python-version != '3.11' }}
         run: |
-          pytest
-      - name: Test with pytest and Codecov
-        if: ${{ matrix.python-version == '3.9' }}
-        run: |
-          python -m pip install pytest-cov
-          pytest --cov=./ --cov-report=xml
-      - name: Upload coverage to Codecov
-        if: ${{ matrix.python-version == '3.9' }}
-        uses: codecov/codecov-action@v1
-        with:
-          verbose: true
+          uv run pytest -n auto
 
   tutorial_tests:
-    runs-on: ubuntu-latest
+    name: Tutorial tests
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        python-version: ['3.7', '3.8', '3.9', '3.10']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
+        os:  [ ubuntu-latest, windows-latest ]
     steps:
-      - uses: actions/checkout@v2
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v2
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@38f3f104447c67c051c4a08e39b64a148898af3a #v4.2.0
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install pytest nbmake pytest-xdist pytest-split python-igraph numba 
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          python -m pip install git+https://github.com/e2nIEE/pandapower@master#egg=pandapower
-          pip install .
+          uv sync --extra all
       - name: List all installed packages
         run: |
-          pip list
+          uv pip list
       - name: Test with pytest
         run: |
-          pytest --nbmake -n=auto "./tutorials"
+          uv run pytest --nbmake -n auto "./tutorials"
+      - name: Test without numba
+        if: ${{ matrix.python-version == '3.11' }}
+        run: |
+          uv pip uninstall numba
+          uv run pytest --nbmake -n auto "./tutorials"
+
+
+  docs_check:
+    name: Sphinx docs check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check sphinx build
+        uses: ammaraskar/sphinx-action@7.4.7
+        with:
+          pre-build-command: "python -m pip install uv && uv pip install .[docs,fileio] --system --link-mode=copy"
+          build-command: "sphinx-build -b html source _build -W"
+          docs-folder: "doc/"
