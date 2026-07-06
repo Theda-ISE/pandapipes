@@ -165,7 +165,7 @@ class HeatGenerator(BranchWOInternalsComponent):
         component_pits[cls.table_name()] = hg_array
 
     @classmethod
-    def adaption_before_derivatives_hydraulic(cls, net, branch_pit, node_pit, idx_lookups, options):
+    def adaption_before_derivatives_hydraulic(cls, net, branch_pit, node_pit, branch_pit_old, node_pit_old,idx_lookups, options):
         """
         Perform adaptions to the branch pit before the derivatives have been calculated globally.
 
@@ -195,7 +195,7 @@ class HeatGenerator(BranchWOInternalsComponent):
             hc_pit[mask, MDOTINIT] = mass
 
     @classmethod
-    def adaption_after_derivatives_hydraulic(cls, net, branch_pit, node_pit, idx_lookups, options):
+    def adaption_after_derivatives_hydraulic(cls, net, branch_pit, node_pit, branch_pit_old, node_pit_old, idx_lookups, options):
         """
         Perform adaptions to the branch pit after the derivatives have been calculated globally.
 
@@ -221,21 +221,30 @@ class HeatGenerator(BranchWOInternalsComponent):
         mask = hg_array[:, cls.MODE] == cls.QE_TR
         if np.any(mask):
             cp = get_branch_cp(get_fluid(net), node_pit, hg_pit)
+            cp_masked = cp[mask]
             from_nodes = get_from_nodes_corrected(hg_pit)
+            from_nodes_masked = from_nodes[mask]
             hg_pit[mask, JAC_DERIV_DP] = 0
             hg_pit[mask, JAC_DERIV_DP1] = 0
-            t_in = node_pit[from_nodes, TINIT]
+            t_in = node_pit[from_nodes_masked, TINIT]
             t_out = hg_pit[mask, TOUTINIT]
             qext = hg_pit[mask, QEXT]
+            df_dm = - cp_masked * (t_out - t_in)
 
-            df_dm = - cp * (t_out - t_in)
-            mask_equal = np.where(qext < 0, t_in >= t_out, t_out >= t_in)
-            mask_zero = hg_pit[:, QEXT] == 0
-            mask_ign = mask_equal | mask_zero
+            mask_equal = np.where(qext < 0, t_in >= t_out, t_out >= t_in)  
+            mask_zero_masked = qext == 0                                   
+            mask_ign_masked = mask_equal | mask_zero_masked                
+
+            mask_ign = np.zeros_like(mask, dtype=bool)
+            mask_ign[mask] = mask_ign_masked
+
             hg_pit[mask & mask_ign, MDOTINIT] = 0
-            hg_pit[mask & ~mask_ign, JAC_DERIV_DM] = df_dm[mask & ~mask_ign]
-            hg_pit[mask, LOAD_VEC_BRANCHES] = - hg_pit[mask, QEXT] + df_dm[mask] * hg_pit[mask, MDOTINIT]
 
+            mask_valid_masked = ~mask_ign_masked
+            hg_pit[mask & ~mask_ign, JAC_DERIV_DM] = df_dm[mask_valid_masked]
+
+            mdot_masked = hg_pit[mask, MDOTINIT]
+            hg_pit[mask, LOAD_VEC_BRANCHES] = -qext + df_dm * mdot_masked
 
         mask = hg_array[:, cls.MODE] == cls.PR_PL
         if np.any(mask):
@@ -246,7 +255,7 @@ class HeatGenerator(BranchWOInternalsComponent):
             hg_pit[mask, JAC_DERIV_DP1] = -1
 
     @classmethod
-    def adaption_before_derivatives_thermal(cls, net, branch_pit, node_pit, idx_lookups, options):
+    def adaption_before_derivatives_thermal(cls, net, branch_pit, node_pit, branch_pit_old, node_pit_old, idx_lookups, options):
         """
         Perform adaptions to the branch pit before the derivatives have been calculated globally.
 
@@ -282,7 +291,7 @@ class HeatGenerator(BranchWOInternalsComponent):
             hg_pit[mask, QEXT] = q_ext
 
     @classmethod
-    def adaption_after_derivatives_thermal(cls, net, branch_pit, node_pit, idx_lookups, options):
+    def adaption_after_derivatives_thermal(cls, net, branch_pit, node_pit, branch_pit_old, node_pit_old, idx_lookups, options):
         """
         Perform adaptions to the branch pit after the derivatives have been calculated globally.
 
@@ -385,22 +394,28 @@ class HeatGenerator(BranchWOInternalsComponent):
         t_from = node_pit[from_nodes, TINIT]
         tout = branch_pit[f:t, TOUTINIT]
 
-        hg_array = get_component_array(net, cls.table_name(), mode='heat_transfer') #Does this work?? Probably not...
-        mask = hg_array[:, cls.MODE] == cls.PR_PL
-        if np.any(mask):
+        hg_array = get_component_array(net, cls.table_name(), mode='heat_transfer')
+        mask_prpl = hg_array[:, cls.MODE] == cls.PR_PL
+        mask_other = ~mask_prpl
+
+        res_table['deltat_k'].values[:] = t_from - tout
+
+        if np.any(mask_prpl):
             fluid = get_fluid(net)
 
-            cp_i = fluid.get_heat_capacity(t_from)
-            cp_i1 = fluid.get_heat_capacity(tout)
+            cp_i = fluid.get_heat_capacity(t_from[mask_prpl])
+            cp_i1 = fluid.get_heat_capacity(tout[mask_prpl])
+            mass = branch_pit[f:t, MDOTINIT][mask_prpl]
 
-            mass = branch_pit[f:t, MDOTINIT]
-            res_table['qext_w'].values[:] = mass * (cp_i1 * tout - cp_i * t_from)
-            res_table['deltat_k'].values[:] = t_from - tout
+            res_table['qext_w'].values[mask_prpl] = mass * (cp_i1 * tout[mask_prpl] - cp_i * t_from[mask_prpl])
 
-            mask = (branch_pit[f:t, MDOTINIT] < 0) & ~np.isclose(branch_pit[f:t, MDOTINIT], 0)
-            if np.any(mask):
-                raise UserWarning(r'Your grid is badly modelled and would lead to a direction change in circulation pump %s'
-                                % str(net[cls.table_name()].index[mask].tolist()))
-        else:
-            res_table['qext_w'].values[:] = -branch_pit[f:t, QEXT]
-            res_table['deltat_k'].values[:] = t_from - tout
+            mask_reverse = (branch_pit[f:t, MDOTINIT][mask_prpl] < 0) & \
+                        ~np.isclose(branch_pit[f:t, MDOTINIT][mask_prpl], 0)
+            if np.any(mask_reverse):
+                raise UserWarning(
+                    r'Your grid is badly modelled and would lead to a direction change in circulation pump %s'
+                    % str(net[cls.table_name()].index[mask_prpl][mask_reverse].tolist())
+                )
+
+        if np.any(mask_other):
+            res_table['qext_w'].values[mask_other] = -branch_pit[f:t, QEXT][mask_other]
